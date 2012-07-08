@@ -47,8 +47,7 @@ namespace NuGetGallery
         {
             // Filter out unlisted packages when searching. We will return it when a generic "GetPackages" request comes and filter it on the client.
             var packages = SearchCore(searchTerm, targetFramework);
-            return packages.Search(searchTerm)
-                           .ToV2FeedPackageQuery(GetSiteRoot());
+            return packages.ToV2FeedPackageQuery(GetSiteRoot());
         }
 
         [WebGet]

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Data.Entity;
 using System.Data.Services;
 using System.Data.Services.Common;
 using System.Data.Services.Providers;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.ServiceModel;
 using System.Web;
 using System.Web.Mvc;
+
 
 namespace NuGetGallery
 {
@@ -140,7 +142,11 @@ namespace NuGetGallery
 
         protected virtual IQueryable<Package> SearchCore(string searchTerm, string targetFramework)
         {
-            var packages = PackageRepo.GetAll().Where(p => p.Listed);
+            var packages = PackageRepo.GetAll()
+                                      .Include(p => p.PackageRegistration)
+                                      .Include(x => x.Authors)
+                                      .Include(x => x.PackageRegistration.Owners)
+                                      .Where(p => p.Listed);
 
             if (String.IsNullOrEmpty(searchTerm))
             {
@@ -148,7 +154,7 @@ namespace NuGetGallery
             }
             if (RequiresLatestVersion())
             {
-                return SearchService.Search(packages, searchTerm);
+                return SearchService.SearchWithRelevance(packages, searchTerm);
             }
             return packages.Search(searchTerm);
         }

@@ -64,7 +64,13 @@ namespace NuGetGallery
         public IQueryable<V1FeedPackage> Search(string searchTerm, string targetFramework)
         {
             // For v1 feed, only allow stable package versions.
-            var packages = SearchCore(searchTerm, targetFramework).Where(p => !p.IsPrerelease);
+            var packages = PackageRepo.GetAll()
+                                      .Include(p => p.PackageRegistration)
+                                      .Where(p => !p.IsPrerelease);
+            if (!String.IsNullOrEmpty(searchTerm))
+            {
+                packages = packages.Search(searchTerm);
+            }
             return packages.ToV1FeedPackageQuery(Configuration.GetSiteRoot(UseHttps()));
         }
     }
