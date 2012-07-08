@@ -46,11 +46,7 @@ namespace NuGetGallery
         public IQueryable<V2FeedPackage> Search(string searchTerm, string targetFramework, bool includePrerelease)
         {
             // Filter out unlisted packages when searching. We will return it when a generic "GetPackages" request comes and filter it on the client.
-            var packages = PackageRepo.GetAll().Where(p => p.Listed);
-            if (!includePrerelease)
-            {
-                packages = packages.Where(p => !p.IsPrerelease);
-            }
+            var packages = SearchCore(searchTerm, targetFramework);
             return packages.Search(searchTerm)
                            .ToV2FeedPackageQuery(GetSiteRoot());
         }
@@ -88,7 +84,7 @@ namespace NuGetGallery
                 var id = idValues[i];
                 SemanticVersion version;
                 SemanticVersion currentVersion;
-                
+
                 if (SemanticVersion.TryParse(versionValues[i], out currentVersion) &&
                      (!versionLookup.TryGetValue(id, out version) || (currentVersion > version)))
                 {

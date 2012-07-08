@@ -3,6 +3,7 @@ using System.Data.Services;
 using System.Data.Services.Common;
 using System.Data.Services.Providers;
 using System.IO;
+using System.Linq;
 using System.ServiceModel;
 using System.Web;
 using System.Web.Mvc;
@@ -28,8 +29,8 @@ namespace NuGetGallery
 
         protected FeedServiceBase(
             IEntitiesContext entities,
-            IEntityRepository<Package> packageRepo, 
-            IConfiguration configuration, 
+            IEntityRepository<Package> packageRepo,
+            IConfiguration configuration,
             ISearchService searchService)
         {
             this.entities = entities;
@@ -42,7 +43,7 @@ namespace NuGetGallery
         {
             get { return entities; }
         }
-        
+
         protected IEntityRepository<Package> PackageRepo
         {
             get { return packageRepo; }
@@ -135,6 +136,28 @@ namespace NuGetGallery
             }
 
             return null;
+        }
+
+        protected virtual IQueryable<Package> SearchCore(string searchTerm, string targetFramework)
+        {
+            var packages = PackageRepo.GetAll().Where(p => p.Listed);
+
+            if (String.IsNullOrEmpty(searchTerm))
+            {
+                return packages;
+            }
+            if (RequiresLatestVersion())
+            {
+                return SearchService.Search(packages, searchTerm);
+            }
+            return packages.Search(searchTerm);
+        }
+
+        internal protected virtual bool RequiresLatestVersion()
+        {
+            // The VS dialog always filters by latest version. However we allow the PS cmdlet to specify the -AllVersion flag that requires us to fetch all packages
+            var request = HttpContext.Current.Request;
+            return request["$filter"].IndexOf("IsLatestVersion", StringComparison.Ordinal) != -1;
         }
 
         protected virtual bool UseHttps()

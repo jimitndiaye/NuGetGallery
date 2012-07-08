@@ -63,15 +63,9 @@ namespace NuGetGallery
         [WebGet]
         public IQueryable<V1FeedPackage> Search(string searchTerm, string targetFramework)
         {
-            // Only allow listed stable releases to be returned when searching the v1 feed.
-            var packages = PackageRepo.GetAll().Where(p => !p.IsPrerelease && p.Listed);
-
-            if (String.IsNullOrEmpty(searchTerm))
-            {
-                return packages.ToV1FeedPackageQuery(Configuration.GetSiteRoot(UseHttps()));
-            }
-            return SearchService.Search(packages, searchTerm)
-                                .ToV1FeedPackageQuery(Configuration.GetSiteRoot(UseHttps()));
+            // For v1 feed, only allow stable package versions.
+            var packages = SearchCore(searchTerm, targetFramework).Where(p => !p.IsPrerelease);
+            return packages.ToV1FeedPackageQuery(Configuration.GetSiteRoot(UseHttps()));
         }
     }
 }
