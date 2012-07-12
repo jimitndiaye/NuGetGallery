@@ -215,6 +215,10 @@
     <Compile Include="CuratedPackagesController.generated.cs">
       <DependentUpon>T4MVC.tt</DependentUpon>
     </Compile>
+    <Compile Include="DataServices\CountQuery.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DataServices\RemoveOrderByVisitor.cs" />
     <Compile Include="DataServices\V2CuratedFeed.svc.cs">
       <DependentUpon>V2CuratedFeed.svc</DependentUpon>
     </Compile>

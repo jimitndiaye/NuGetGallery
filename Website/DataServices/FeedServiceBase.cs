@@ -8,7 +8,7 @@ using System.Linq;
 using System.ServiceModel;
 using System.Web;
 using System.Web.Mvc;
-
+using QueryInterceptor;
 
 namespace NuGetGallery
 {
@@ -152,23 +152,77 @@ namespace NuGetGallery
             {
                 return packages;
             }
-            if (RequiresLatestVersion())
+            var parameters = ReadODataParameters();
+            if (parameters.FilterByLatestVersion)
             {
-                return SearchService.SearchWithRelevance(packages, searchTerm);
+                // Determines if the query requires filtering by latest version. A user could ask for all versions of a package by specifying the -All parameter in the cmdlet.
+                return GetResultsFromSearchService(packages, searchTerm, parameters);
             }
             return packages.Search(searchTerm);
         }
 
-        internal protected virtual bool RequiresLatestVersion()
+        private IQueryable<Package> GetResultsFromSearchService(IQueryable<Package> packages, string searchTerm, ODataParameters parameters)
         {
-            // The VS dialog always filters by latest version. However we allow the PS cmdlet to specify the -AllVersion flag that requires us to fetch all packages
+            // For count queries, we can ask Lucene to essentially no-op. A cleaner way to do this would be to have a method on the search service that simply gives counts, 
+            // but it seems like overkill.
+            int take = parameters.IsCountQuery ? 0 : (parameters.Skip + 1) * parameters.Top;
+            int totalHits = 0;
+            var result = SearchService.SearchWithRelevance(packages, searchTerm, take, out totalHits);
+
+            if (parameters.IsCountQuery)
+            {
+                // At this point, we already know what the total count is. We can have it return this value very quickly without doing any SQL by using our custom query provider.
+                return new CountQuery<Package>(totalHits);
+            }
+            else if (!parameters.IsOrderedQuery)
+            {
+                // If no order by parameters are provided, OData decides to sort it by the primary keys in this case Id and Version. We don't want it affecting our relevance 
+                // results, so we have it removed.
+                result = result.InterceptWith(new RemoveOrderByVisitor());
+            }
+            return result;
+        }
+
+        private ODataParameters ReadODataParameters()
+        {
             var request = HttpContext.Current.Request;
-            return request["$filter"].IndexOf("IsLatestVersion", StringComparison.Ordinal) != -1;
+
+            return new ODataParameters
+            {
+                IsCountQuery = request.Path.TrimEnd('/').EndsWith("$count"),
+
+                FilterByLatestVersion = request["$filter"].IndexOf("IsLatestVersion", StringComparison.Ordinal) != -1,
+
+                Top = ReadInt(request["$top"], 30),
+
+                Skip = ReadInt(request["$skip"], 0),
+                
+                IsOrderedQuery = !String.IsNullOrEmpty(request["$orderby"])
+            };
+        }
+
+        private int ReadInt(string requestValue, int defaultValue)
+        {
+            int result;
+            return Int32.TryParse(requestValue, out result) ? result : defaultValue;
         }
 
         protected virtual bool UseHttps()
         {
             return HttpContext.Current.Request.IsSecureConnection;
+        }
+
+        private sealed class ODataParameters
+        {
+            public bool IsCountQuery { get; set; }
+
+            public bool IsOrderedQuery { get; set; }
+
+            public bool FilterByLatestVersion { get; set; }
+
+            public int Top { get; set; }
+
+            public int Skip { get; set; }
         }
     }
 }
