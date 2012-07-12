@@ -153,12 +153,29 @@ namespace NuGetGallery
                 return packages;
             }
             var parameters = ReadODataParameters();
-            if (parameters.FilterByLatestVersion)
+            if (SearchLatestVersions(parameters))
             {
-                // Determines if the query requires filtering by latest version. A user could ask for all versions of a package by specifying the -All parameter in the cmdlet.
-                return GetResultsFromSearchService(packages, searchTerm, parameters);
+                if (SearchWithRelevance(parameters))
+                {
+                    return GetResultsFromSearchService(packages, searchTerm, parameters);
+                }
+                return SearchService.Search(packages, searchTerm);
             }
             return packages.Search(searchTerm);
+        }
+
+        /// <summary>
+        /// Determines if we can use relevance based searches. This is heavily optimized by performing paging and sorting within Lucene retrieving the smallest set of packages we can. 
+        /// We can use relevance if (a) the query filters by IsLatestVersion (b) the query does not have an order-by parameter.
+        /// </summary>
+        private bool SearchWithRelevance(ODataParameters parameters)
+        {
+            return SearchLatestVersions(parameters) && parameters.IsOrderedQuery;
+        }
+
+        private static bool SearchLatestVersions(ODataParameters parameters)
+        {
+            return parameters.FilterByLatestVersion;
         }
 
         private IQueryable<Package> GetResultsFromSearchService(IQueryable<Package> packages, string searchTerm, ODataParameters parameters)
